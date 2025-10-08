@@ -16,46 +16,52 @@ st.set_page_config(
 def load_data(uploaded_file):
     """
     Loads, cleans, and prepares sales data from a user-uploaded file.
-    This function is cached to improve performance.
+    This function is now upgraded to dynamically read product names from the file header.
     """
     try:
-        # Read the file as an Excel file, which is more robust.
-        df = pd.read_excel(uploaded_file, header=None, skiprows=2, engine='openpyxl')
-        product_headers = [
-            "Date", "Col2_Total", "Product_A", "Product_B", "Product_C",
-            "Product_D", "Product_E", "Product_F", "Product_G",
-            "Product_H", "Product_I", "Product_J", "Product_K",
-            "Product_L", "Product_M", "Product_N", "Product_O", "Product_P"
-        ]
-        num_columns_read = df.shape[1]
-        df.columns = product_headers[:num_columns_read]
-
-        # A more robust cleaning sequence for dates.
-        # 1. First, ensure the column is a string and strip any leading/trailing whitespace.
-        df['Date'] = df['Date'].astype(str).str.strip()
+        # THE FIX: Intelligently read the multi-level header to get real product names.
+        # 1. Read the first two rows to capture the header information.
+        header_df = pd.read_excel(uploaded_file, header=None, nrows=2, engine='openpyxl')
         
-        # 2. Now, convert to datetime, letting pandas infer the format.
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        # 2. Forward-fill the product names on the first row to handle merged cells.
+        header_df.iloc[0] = header_df.iloc[0].ffill()
+        
+        # 3. Combine the two header rows into one. Replace NaN with an empty string.
+        header_df = header_df.fillna('')
+        combined_headers = header_df.iloc[0].astype(str) + ' ' + header_df.iloc[1].astype(str)
+        
+        # 4. Clean up the combined headers for better readability.
+        combined_headers = combined_headers.str.strip().str.replace(' ', '_').str.replace('__', '_').str.rstrip('_')
+        
+        # 5. Read the actual data, skipping the header rows we just processed.
+        df = pd.read_excel(uploaded_file, header=None, skiprows=2, engine='openpyxl')
+        
+        # 6. Assign the new, dynamic headers.
+        num_columns_read = df.shape[1]
+        df.columns = combined_headers[:num_columns_read]
+        
+        # 7. Rename the first column to 'Date' for consistency.
+        df = df.rename(columns={df.columns[0]: 'Date'})
 
-        # 3. Drop any rows where the date conversion failed.
+        # --- The rest of the cleaning process continues as before ---
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df.dropna(subset=['Date'], inplace=True)
 
         if df.empty:
             st.warning("Warning: The uploaded file was loaded, but no valid data rows were found after cleaning. Please check the file's content and format.")
             return None
         
-        # Identify numeric columns, safely excluding the total column if it exists
-        numeric_cols = df.columns.drop(['Date'])
-        if 'Col2_Total' in numeric_cols:
-            numeric_cols = numeric_cols.drop(['Col2_Total'])
+        # Identify numeric columns, safely excluding any 'Total' column
+        numeric_cols = [col for col in df.columns if col != 'Date' and 'Total' not in col]
 
         df[numeric_cols] = df[numeric_cols].fillna(0)
         for col in numeric_cols:
             df[col] = df[col].astype(int)
 
         df.set_index('Date', inplace=True)
-        if 'Col2_Total' in df.columns:
-            df.drop(columns=['Col2_Total'], inplace=True)
+        # Drop any column that has 'Total' in its name
+        total_cols_to_drop = [col for col in df.columns if 'Total' in col]
+        df.drop(columns=total_cols_to_drop, inplace=True)
             
         df = df.loc[:, (df != 0).any(axis=0)]
         return df
@@ -68,7 +74,7 @@ st.title("📈 Dynamic Sales & Inventory Dashboard")
 st.markdown("Upload your sales data in Excel format to generate an interactive business analytics report.")
 
 uploaded_file = st.file_uploader(
-    "Choose an Excel file",
+    "Choose an Excel file (ensure it has a 2-row header for product names)",
     type=['xlsx', 'xls']
 )
 
