@@ -19,8 +19,8 @@ def load_data(file_path):
     This function is cached to improve performance.
     """
     try:
-        # We use read_csv with the 'python' engine to handle parsing irregularities.
-        df = pd.read_csv(file_path, header=None, skiprows=2, engine='python')
+        # THE FIX: Add encoding='latin1' to correctly read the file's character encoding.
+        df = pd.read_csv(file_path, header=None, skiprows=2, engine='python', encoding='latin1')
         product_headers = [
             "Date", "Dr.Phenyle_Total", "Dr.Phenyle_450ML", "Dr.Phenyle_5L", "Dr.Phenyle_200ML",
             "DiamondBall_100PCS", "3DSOL_500ML", "NEEM_1L", "BlackCactus_450ML",
@@ -30,7 +30,7 @@ def load_data(file_path):
         num_columns_read = df.shape[1]
         df.columns = product_headers[:num_columns_read]
 
-        # THE FIX: A more robust cleaning sequence for dates.
+        # A more robust cleaning sequence for dates.
         # 1. First, ensure the column is a string and strip any leading/trailing whitespace.
         df['Date'] = df['Date'].astype(str).str.strip()
         
