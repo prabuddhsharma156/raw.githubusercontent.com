@@ -19,7 +19,8 @@ def load_data(file_path):
     This function is cached to improve performance.
     """
     try:
-        df = pd.read_excel(file_path, header=None, skiprows=2)
+        # THE FIX: Explicitly specify the engine for reading the Excel file.
+        df = pd.read_excel(file_path, header=None, skiprows=2, engine='openpyxl')
         product_headers = [
             "Date", "Dr.Phenyle_Total", "Dr.Phenyle_450ML", "Dr.Phenyle_5L", "Dr.Phenyle_200ML",
             "DiamondBall_100PCS", "3DSOL_500ML", "NEEM_1L", "BlackCactus_450ML",
