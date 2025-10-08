@@ -15,12 +15,13 @@ st.set_page_config(
 @st.cache_data
 def load_data(file_path):
     """
-    Loads, cleans, and prepares the sales data from an Excel file.
+    Loads, cleans, and prepares the sales data from a file on GitHub.
     This function is cached to improve performance.
     """
     try:
-        # THE FIX: Explicitly specify the engine for reading the Excel file.
-        df = pd.read_excel(file_path, header=None, skiprows=2, engine='openpyxl')
+        # THE FIX: Revert to using read_csv, as the source file is a CSV, not a true Excel file.
+        # We use the 'python' engine to handle potential parsing irregularities.
+        df = pd.read_csv(file_path, header=None, skiprows=2, engine='python')
         product_headers = [
             "Date", "Dr.Phenyle_Total", "Dr.Phenyle_450ML", "Dr.Phenyle_5L", "Dr.Phenyle_200ML",
             "DiamondBall_100PCS", "3DSOL_500ML", "NEEM_1L", "BlackCactus_450ML",
@@ -32,17 +33,24 @@ def load_data(file_path):
         df.dropna(subset=['Date'], inplace=True)
         df = df[pd.to_datetime(df['Date'], errors='coerce').notna()]
         df['Date'] = pd.to_datetime(df['Date'])
-        numeric_cols = df.columns.drop(['Date', 'Dr.Phenyle_Total'])
+        
+        # Identify numeric columns, safely excluding 'Dr.Phenyle_Total' if it exists
+        numeric_cols = df.columns.drop(['Date'])
+        if 'Dr.Phenyle_Total' in numeric_cols:
+            numeric_cols = numeric_cols.drop(['Dr.Phenyle_Total'])
+
         df[numeric_cols] = df[numeric_cols].fillna(0)
         for col in numeric_cols:
             df[col] = df[col].astype(int)
+
         df.set_index('Date', inplace=True)
         if 'Dr.Phenyle_Total' in df.columns:
             df.drop(columns=['Dr.Phenyle_Total'], inplace=True)
+            
         df = df.loc[:, (df != 0).any(axis=0)]
         return df
     except FileNotFoundError:
-        st.error(f"Error: The data file '{file_path}' was not found. Please make sure it's in the same directory as the app.")
+        st.error(f"Error: The data file at the specified URL was not found. Please check the link in the code.")
         return None
     except Exception as e:
         st.error(f"An error occurred while loading the data: {e}")
