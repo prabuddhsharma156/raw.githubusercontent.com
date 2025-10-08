@@ -19,8 +19,7 @@ def load_data(file_path):
     This function is cached to improve performance.
     """
     try:
-        # THE FIX: Revert to using read_csv, as the source file is a CSV, not a true Excel file.
-        # We use the 'python' engine to handle potential parsing irregularities.
+        # We use read_csv with the 'python' engine to handle parsing irregularities.
         df = pd.read_csv(file_path, header=None, skiprows=2, engine='python')
         product_headers = [
             "Date", "Dr.Phenyle_Total", "Dr.Phenyle_450ML", "Dr.Phenyle_5L", "Dr.Phenyle_200ML",
@@ -32,6 +31,12 @@ def load_data(file_path):
         df.columns = product_headers[:num_columns_read]
         df.dropna(subset=['Date'], inplace=True)
         df = df[pd.to_datetime(df['Date'], errors='coerce').notna()]
+        
+        # THE FIX: Add a check to see if the dataframe is empty after cleaning.
+        if df.empty:
+            st.warning("Warning: The data file was loaded, but no valid data rows were found after cleaning. Please check the file's content and format.")
+            return None
+
         df['Date'] = pd.to_datetime(df['Date'])
         
         # Identify numeric columns, safely excluding 'Dr.Phenyle_Total' if it exists
