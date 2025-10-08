@@ -30,11 +30,14 @@ def load_data(file_path):
         num_columns_read = df.shape[1]
         df.columns = product_headers[:num_columns_read]
 
-        # THE FIX: Explicitly provide the date format to ensure correct parsing.
-        # 1. Attempt to convert 'Date' using the specific format YYYY-MM-DD.
-        df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d', errors='coerce')
+        # THE FIX: A more robust cleaning sequence for dates.
+        # 1. First, ensure the column is a string and strip any leading/trailing whitespace.
+        df['Date'] = df['Date'].astype(str).str.strip()
+        
+        # 2. Now, convert to datetime, letting pandas infer the format.
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-        # 2. Now, drop any rows where the date conversion failed.
+        # 3. Drop any rows where the date conversion failed.
         df.dropna(subset=['Date'], inplace=True)
 
         if df.empty:
@@ -65,7 +68,7 @@ def load_data(file_path):
 
 # --- Main Application Logic ---
 # IMPORTANT: Replace the URL below with the raw URL of your data file from GitHub
-data_file_path = 'https://view.officeapps.live.com/op/view.aspx?src=https%3A%2F%2Fraw.githubusercontent.com%2Fprabuddhsharma156%2Fraw.githubusercontent.com%2Frefs%2Fheads%2Fmain%2FBusiness%2520Analytics%2520CA.xlsx&wdOrigin=BROWSELINK'
+data_file_path = 'https://raw.githubusercontent.com/prabuddhsharma156/raw.githubusercontent.com/main/Business%20Analytics%20CA.xlsx'
 df = load_data(data_file_path)
 
 if df is not None:
