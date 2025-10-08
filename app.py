@@ -30,9 +30,9 @@ def load_data(file_path):
         num_columns_read = df.shape[1]
         df.columns = product_headers[:num_columns_read]
 
-        # THE FIX: A more robust cleaning sequence.
-        # 1. Attempt to convert the 'Date' column. Values that can't be converted will become 'NaT' (Not a Time).
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        # THE FIX: Explicitly provide the date format to ensure correct parsing.
+        # 1. Attempt to convert 'Date' using the specific format YYYY-MM-DD.
+        df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d', errors='coerce')
 
         # 2. Now, drop any rows where the date conversion failed.
         df.dropna(subset=['Date'], inplace=True)
