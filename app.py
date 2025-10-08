@@ -29,15 +29,17 @@ def load_data(file_path):
         ]
         num_columns_read = df.shape[1]
         df.columns = product_headers[:num_columns_read]
+
+        # THE FIX: A more robust cleaning sequence.
+        # 1. Attempt to convert the 'Date' column. Values that can't be converted will become 'NaT' (Not a Time).
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+
+        # 2. Now, drop any rows where the date conversion failed.
         df.dropna(subset=['Date'], inplace=True)
-        df = df[pd.to_datetime(df['Date'], errors='coerce').notna()]
-        
-        # THE FIX: Add a check to see if the dataframe is empty after cleaning.
+
         if df.empty:
             st.warning("Warning: The data file was loaded, but no valid data rows were found after cleaning. Please check the file's content and format.")
             return None
-
-        df['Date'] = pd.to_datetime(df['Date'])
         
         # Identify numeric columns, safely excluding 'Dr.Phenyle_Total' if it exists
         numeric_cols = df.columns.drop(['Date'])
@@ -196,7 +198,7 @@ if df is not None:
             
             # Create the average line
             avg_rule = alt.Chart(product_df).mark_rule(color='red', strokeDash=[3,3]).encode(
-                y=f'mean(\'{product_to_view}\'):Q'
+                y=f'mean(\'Units Sold\'):Q'
             )
             
             st.altair_chart((line_chart + avg_rule), use_container_width=True)
