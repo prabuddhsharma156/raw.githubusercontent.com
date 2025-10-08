@@ -49,7 +49,7 @@ def load_data(file_path):
 
 # --- Main Application Logic ---
 # IMPORTANT: Replace the URL below with the raw URL of your data file from GitHub
-data_file_path = 'https://raw.githubusercontent.com/YOUR_USERNAME/raw.githubusercontent.com/main/Business%20Analytics%20CA.xlsx'
+data_file_path = 'https://view.officeapps.live.com/op/view.aspx?src=https%3A%2F%2Fraw.githubusercontent.com%2Fprabuddhsharma156%2Fraw.githubusercontent.com%2Frefs%2Fheads%2Fmain%2FBusiness%2520Analytics%2520CA.xlsx&wdOrigin=BROWSELINK'
 df = load_data(data_file_path)
 
 if df is not None:
