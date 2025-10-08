@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import altair as alt
+from datetime import timedelta
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -19,28 +20,18 @@ def load_data(uploaded_file):
     This function is now upgraded to dynamically read product names from the file header.
     """
     try:
-        # THE FIX: Intelligently read the multi-level header to get real product names.
-        # 1. Read the first two rows to capture the header information.
+        # Intelligently read the multi-level header to get real product names.
         header_df = pd.read_excel(uploaded_file, header=None, nrows=2, engine='openpyxl')
-        
-        # 2. Forward-fill the product names on the first row to handle merged cells.
         header_df.iloc[0] = header_df.iloc[0].ffill()
-        
-        # 3. Combine the two header rows into one. Replace NaN with an empty string.
         header_df = header_df.fillna('')
         combined_headers = header_df.iloc[0].astype(str) + ' ' + header_df.iloc[1].astype(str)
-        
-        # 4. Clean up the combined headers for better readability.
         combined_headers = combined_headers.str.strip().str.replace(' ', '_').str.replace('__', '_').str.rstrip('_')
         
-        # 5. Read the actual data, skipping the header rows we just processed.
         df = pd.read_excel(uploaded_file, header=None, skiprows=2, engine='openpyxl')
         
-        # 6. Assign the new, dynamic headers.
         num_columns_read = df.shape[1]
         df.columns = combined_headers[:num_columns_read]
         
-        # 7. Rename the first column to 'Date' for consistency.
         df = df.rename(columns={df.columns[0]: 'Date'})
 
         # --- The rest of the cleaning process continues as before ---
@@ -51,7 +42,6 @@ def load_data(uploaded_file):
             st.warning("Warning: The uploaded file was loaded, but no valid data rows were found after cleaning. Please check the file's content and format.")
             return None
         
-        # Identify numeric columns, safely excluding any 'Total' column
         numeric_cols = [col for col in df.columns if col != 'Date' and 'Total' not in col]
 
         df[numeric_cols] = df[numeric_cols].fillna(0)
@@ -59,7 +49,6 @@ def load_data(uploaded_file):
             df[col] = df[col].astype(int)
 
         df.set_index('Date', inplace=True)
-        # Drop any column that has 'Total' in its name
         total_cols_to_drop = [col for col in df.columns if 'Total' in col]
         df.drop(columns=total_cols_to_drop, inplace=True)
             
@@ -85,7 +74,8 @@ if uploaded_file is not None:
         # --- Sidebar ---
         st.sidebar.title("Dashboard Navigation")
         st.sidebar.markdown("Use the options below to explore the business analytics.")
-        page = st.sidebar.radio("Go to", ("Executive Summary", "What-If Simulation", "Detailed Product Analysis"))
+        # NEW FEATURE: Added "Sales Forecasting" to the navigation
+        page = st.sidebar.radio("Go to", ("Executive Summary", "What-If Simulation", "Detailed Product Analysis", "Sales Forecasting"))
         st.sidebar.markdown("---")
         st.sidebar.info(
             "This dashboard provides automated analysis for sales and inventory management."
@@ -223,6 +213,66 @@ if uploaded_file is not None:
                 kpi2.metric(label="Average Daily Sales", value=f"{mean_sales[product_to_view]:.2f}")
                 kpi3.metric(label="Sales Volatility (CV)", value=f"{coefficient_of_variation[product_to_view]:.2f}")
                 kpi4.metric(label="Recommended Reorder Point", value=int(reorder_point_val))
+        
+        # --- NEW FEATURE PAGE: Sales Forecasting ---
+        elif page == "Sales Forecasting":
+            st.header("🔮 Sales Forecasting")
+            st.markdown("Generate a sales forecast for any product based on its recent performance.")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                product_to_forecast = st.selectbox("Select Product to Forecast", df.columns)
+            with col2:
+                forecast_days = st.slider("Number of Days to Forecast", min_value=7, max_value=90, value=30, step=7)
+
+            if st.button("📈 Generate Forecast"):
+                st.markdown("---")
+                st.subheader(f"Forecast for {product_to_forecast}")
+
+                # Simple forecasting model: Use the average of the last 14 days of sales
+                last_14_days_avg = df[product_to_forecast].tail(14).mean()
+                
+                # Create future dates for the forecast
+                last_date = df.index.max()
+                future_dates = [last_date + timedelta(days=i) for i in range(1, forecast_days + 1)]
+                
+                # Create forecast dataframe
+                forecast_values = [int(last_14_days_avg)] * forecast_days
+                forecast_df = pd.DataFrame({
+                    'Date': future_dates,
+                    'Forecasted Sales': forecast_values
+                }).set_index('Date')
+                
+                st.dataframe(forecast_df)
+
+                # Prepare data for charting
+                historical_data = df[[product_to_forecast]].reset_index()
+                historical_data.columns = ['Date', 'Sales']
+                historical_data['Type'] = 'Historical'
+
+                forecast_data = forecast_df.reset_index()
+                forecast_data.columns = ['Date', 'Sales']
+                forecast_data['Type'] = 'Forecast'
+                
+                combined_chart_df = pd.concat([historical_data, forecast_data])
+
+                # Create the chart
+                chart = alt.Chart(combined_chart_df).mark_line(point=True).encode(
+                    x=alt.X('Date:T', title="Date"),
+                    y=alt.Y('Sales:Q', title="Units Sold"),
+                    color=alt.Color('Type:N', title="Data Type"),
+                    strokeDash=alt.condition(
+                        alt.datum.Type == 'Forecast',
+                        alt.value([5, 5]),  # Dashed line for forecast
+                        alt.value([0]),     # Solid line for historical
+                    ),
+                    tooltip=['Date', 'Sales', 'Type']
+                ).properties(
+                    title=f"Historical Sales vs. {forecast_days}-Day Forecast"
+                ).interactive()
+
+                st.altair_chart(chart, use_container_width=True)
+
 else:
     st.info("Please upload an Excel file to begin the analysis.")
 
