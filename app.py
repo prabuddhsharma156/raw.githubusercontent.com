@@ -27,7 +27,8 @@ def load_data(uploaded_file):
     """
     Loads, cleans, and prepares sales data from a user-uploaded file.
     """
-    try
+    # THE FIX: Added the missing colon after 'try'
+    try:
         # Data loading and cleaning logic... (omitted for brevity, as it is correct)
         header_df = pd.read_excel(uploaded_file, header=None, nrows=2, engine='openpyxl')
         header_df.iloc[0] = header_df.iloc[0].ffill()
@@ -85,7 +86,38 @@ if uploaded_file is not None:
         # --- Page 1: Executive Summary ---
         if page == "Executive Summary":
             st.header("Executive Summary")
-            # ... (Executive Summary code remains the same)
+            st.markdown("This page provides a high-level overview of product performance and demand stability.")
+            st.markdown("---")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("✅ Top 3 Best-Selling Products")
+                st.dataframe(total_sales.head(3).rename("Total Units Sold"))
+
+            with col2:
+                st.subheader("❌ Bottom 3 Worst-Selling Products")
+                st.dataframe(total_sales.tail(3).rename("Total Units Sold"))
+                
+            st.markdown("---")
+            st.subheader("⚡ Demand Volatility Analysis (Predictability)")
+            st.markdown(
+                "The **Coefficient of Variation (CV)** measures sales predictability. "
+                "A **high CV** indicates volatile, unpredictable demand, which requires higher safety stock."
+            )
+            
+            cv_df = coefficient_of_variation.reset_index()
+            cv_df.columns = ['Product', 'Coefficient of Variation']
+            
+            chart = alt.Chart(cv_df).mark_bar().encode(
+                x=alt.X('Product:N', sort='-y', title="Product"),
+                y=alt.Y('Coefficient of Variation:Q', title="CV (Higher = Less Predictable)"),
+                tooltip=['Product', 'Coefficient of Variation']
+            ).properties(
+                title='Product Sales Volatility'
+            ).interactive()
+
+            st.altair_chart(chart, use_container_width=True)
+
 
         # --- Page 2: What-If Simulation ---
         elif page == "What-If Simulation":
@@ -143,7 +175,41 @@ if uploaded_file is not None:
         # --- Page 3: Detailed Product Analysis ---
         elif page == "Detailed Product Analysis":
             st.header("📊 Detailed Product Analysis")
-            # ... (Detailed Product Analysis code remains the same)
+            st.markdown("Select any product to view its sales trend and key performance indicators.")
+
+            product_to_view = st.selectbox("Select a Product", df.columns, key="detailed_product")
+            
+            if product_to_view:
+                st.markdown("---")
+                st.subheader(f"Sales Trend for {product_to_view}")
+                
+                product_df = df[[product_to_view]].reset_index()
+                product_df.columns = ['Date', 'Units Sold']
+
+                line_chart = alt.Chart(product_df).mark_line(point=True).encode(
+                    x='Date:T',
+                    y='Units Sold:Q',
+                    tooltip=['Date:T', 'Units Sold:Q']
+                ).interactive()
+                
+                avg_rule = alt.Chart(product_df).mark_rule(color='red', strokeDash=[3,3]).encode(
+                    y=f'mean(\'Units Sold\'):Q'
+                )
+                
+                st.altair_chart((line_chart + avg_rule), use_container_width=True)
+
+                st.markdown("---")
+                st.subheader("Key Analytics")
+                
+                LEAD_TIME_DAYS = 3
+                Z_SCORE = 1.65
+                reorder_point_val = (mean_sales[product_to_view] * LEAD_TIME_DAYS + (Z_SCORE * np.sqrt(LEAD_TIME_DAYS) * std_sales[product_to_view])).round(0)
+                
+                kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+                kpi1.metric(label="Total Units Sold", value=int(total_sales[product_to_view]))
+                kpi2.metric(label="Average Daily Sales", value=f"{mean_sales[product_to_view]:.2f}")
+                kpi3.metric(label="Sales Volatility (CV)", value=f"{coefficient_of_variation[product_to_view]:.2f}")
+                kpi4.metric(label="Recommended Reorder Point", value=int(reorder_point_val))
         
         # --- Page 4: Sales Forecasting ---
         elif page == "Sales Forecasting":
